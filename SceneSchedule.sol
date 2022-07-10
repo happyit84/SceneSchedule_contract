@@ -66,7 +66,7 @@ contract SceneSchedule is Ownable {
         return block.timestamp;
     }
 
-    function balance() public view onlyOwner returns (uint) {
+    function balance() public view onlyOwner returns (uint) {        
         return address(this).balance;
     }
     
@@ -90,7 +90,7 @@ contract SceneSchedule is Ownable {
         return fee.getFeePerDay();
     }
 
-    function createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) external payable returns (uint256 scheduleIndex) {
+    function createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) public payable returns (uint256 scheduleIndex, ScheduleInfo info) {
         // check if timestamp is hour base
         require(_startTimestamp >= block.timestamp, "_startTimestamp should not be past time.");
         require(_startTimestamp % 3600 == 0, "_startTimestamp should point at starting of each hour.");
@@ -110,7 +110,7 @@ contract SceneSchedule is Ownable {
                 revert("There's already reserved time.");
         }
 
-        ScheduleInfo info = new ScheduleInfo(_startTimestamp, _endTimestamp, msg.sender, _data);
+        info = new ScheduleInfo(_startTimestamp, _endTimestamp, msg.sender, _data);
         schedules.push(info);
         scheduleIndex = schedules.length - 1;
 
@@ -118,8 +118,18 @@ contract SceneSchedule is Ownable {
             scheduleMap[t] = scheduleIndex;
         }
 
-        payable(address(this)).transfer(msg.value);
+        (bool ret, ) = payable(address(this)).call{value: msg.value}("");
+        require(ret, "failed to send ETH to contract");
 
-        return scheduleIndex;
+        return (scheduleIndex, info);
+    }
+
+    function test_createSchedule() public payable returns (uint256 scheduleIndex, ScheduleInfo info) {
+
+        uint timestampNow = block.timestamp;
+        uint remainder = timestampNow % 3600;
+        uint earliestStartTime = timestampNow - remainder + 3600;
+        uint earliestEndTime = earliestStartTime + 3600;
+        return createSchedule(earliestStartTime, earliestEndTime, "...");
     }
 }
