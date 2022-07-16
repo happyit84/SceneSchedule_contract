@@ -55,12 +55,18 @@ contract ScheduleInfo {
 contract SceneSchedule is Ownable {
     FeeCache private fee;
     ScheduleInfo [] schedules;
-    mapping(uint => uint) scheduleMap; // each starting hour => index in schedules
+    mapping(uint => uint) scheduleMap; // each starting hour timpstamp => index in schedules
     uint constant NotReserved = 0; // value for representing not reserved in scheduleMap
 
-    constructor() {
+    constructor() payable {
         fee = new FeeCache();
+
+        // add dummy info at the index=0, to use index 0 as NotReserved
+        ScheduleInfo dummyInfo = new ScheduleInfo(0, 0, address(this), "");
+        schedules.push(dummyInfo);
     }
+
+    receive() external payable {} // need payable keyword to get ETH
 
     function getTimestampNow() public view returns (uint) {
         return block.timestamp;
@@ -90,11 +96,23 @@ contract SceneSchedule is Ownable {
         return fee.getFeePerDay();
     }
 
+    function getNotReserved() external pure returns (uint) {
+        return NotReserved;
+    }
+
+    function getScheduleIndex(uint _startTimestamp) public view returns (uint) {
+        require(_startTimestamp % 3600 == 0, "_startTimestamp should point at the starting of each hour");
+        return scheduleMap[_startTimestamp];
+    }
+
     function createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) public payable returns (uint256 scheduleIndex, ScheduleInfo info) {
         // check if timestamp is hour base
         require(_startTimestamp >= block.timestamp, "_startTimestamp should not be past time.");
         require(_startTimestamp % 3600 == 0, "_startTimestamp should point at starting of each hour.");
-        require(_endTimestamp % 3600 == 0, "_endTimestamp should point at the starting of each hour.");
+        if (_endTimestamp == 0)
+            _endTimestamp = _startTimestamp + 3600;
+        else
+            require(_endTimestamp % 3600 == 0, "_endTimestamp should point at the starting of each hour.");
         require(_startTimestamp < _endTimestamp, "_startTimestamp should be earlier than _endTimpstamp.");
 
         uint hourCount = (_endTimestamp - _startTimestamp) / 3600;
@@ -106,8 +124,7 @@ contract SceneSchedule is Ownable {
 
 
         for (uint t = _startTimestamp; t < _endTimestamp ; t += 3600) {
-            if (NotReserved != scheduleMap[t]) 
-                revert("There's already reserved time.");
+            require(NotReserved == scheduleMap[t], "There's already reserved time.") ;
         }
 
         info = new ScheduleInfo(_startTimestamp, _endTimestamp, msg.sender, _data);
@@ -124,12 +141,22 @@ contract SceneSchedule is Ownable {
         return (scheduleIndex, info);
     }
 
-    function test_createSchedule() public payable returns (uint256 scheduleIndex, ScheduleInfo info) {
+    /*
+    function createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) external payable returns (uint256 scheduleIndex, ScheduleInfo info) {
+        return createSchedule_(_startTimestamp, _endTimestamp, _data);
+    }
 
+    function test_createSchedule() public payable returns (uint256 scheduleIndex, ScheduleInfo info) {
+        // create schedule 
         uint timestampNow = block.timestamp;
         uint remainder = timestampNow % 3600;
         uint earliestStartTime = timestampNow - remainder + 3600;
         uint earliestEndTime = earliestStartTime + 3600;
-        return createSchedule(earliestStartTime, earliestEndTime, "...");
+        require(msg.value == 3600, "Need value: 3600 Wei.");
+        createSchedule_(earliestStartTime, earliestEndTime, "...");
+
+        // try again
+
     }
+    */
 }
