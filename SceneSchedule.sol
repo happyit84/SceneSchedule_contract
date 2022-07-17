@@ -41,7 +41,7 @@ contract FeeCache {
 contract ScheduleInfo {
     uint public startTimestamp; // inclusive
     uint public endTimestamp; // exclusive
-    address booker;
+    address public booker;
     string public data;
 
     constructor (uint _startTimestamp, uint _endTimestamp, address _booker, string memory _data) {
@@ -57,13 +57,18 @@ contract SceneSchedule is Ownable {
     ScheduleInfo [] schedules;
     mapping(uint => uint) scheduleMap; // each starting hour timpstamp => index in schedules
     uint constant NotReserved = 0; // value for representing not reserved in scheduleMap
+    uint constant MinuteInSeconds = 60;
+    uint constant HourInSeconds = MinuteInSeconds * 60;
+    uint constant DayInSeconds = HourInSeconds * 24;
+    uint private createScheduleLimitSeconds; // from present point only can create schedule within this value of seconds in the future
 
     constructor() payable {
         fee = new FeeCache();
 
         // add dummy info at the index=0, to use index 0 as NotReserved
-        ScheduleInfo dummyInfo = new ScheduleInfo(0, 0, address(this), "");
+        ScheduleInfo dummyInfo = new ScheduleInfo(0, 0, address(0), "");
         schedules.push(dummyInfo);
+        createScheduleLimitSeconds = 30 * 24 * 60 * 60; // 30 days
     }
 
     receive() external payable {} // need payable keyword to get ETH
@@ -76,8 +81,15 @@ contract SceneSchedule is Ownable {
         return address(this).balance;
     }
     
-    function setFee(uint256 newFeeWeiPerSecond) public onlyOwner {
+    function setFee(uint newFeeWeiPerSecond) public onlyOwner {
         fee.setFee(newFeeWeiPerSecond);
+    }
+
+    function getCreateScheduleLimitSeconds() public view returns (uint) {
+        return createScheduleLimitSeconds;
+    }
+    function setCreateScheduleLimitSeconds(uint newValue) public onlyOwner {
+        createScheduleLimitSeconds = newValue;
     }
 
     function getFeePerSecond() public view returns (uint256 weiPerSecond) {
@@ -100,22 +112,55 @@ contract SceneSchedule is Ownable {
         return NotReserved;
     }
 
+    function getEarliestStartingHourTimestamp() public view returns (uint) {
+        uint timestampNow = block.timestamp;
+        uint remainder = timestampNow % HourInSeconds;
+        uint earliestStartTime = timestampNow - remainder + HourInSeconds;
+        return earliestStartTime;
+    }
+
+    function getMySchedule() public view returns (ScheduleInfo[] memory) {
+        uint earliestStarting = getEarliestStartingHourTimestamp();
+        uint present = earliestStarting - HourInSeconds;
+        uint limitStating = earliestStarting + createScheduleLimitSeconds;
+
+        ScheduleInfo [] memory mySchedules;
+        uint count = 0;
+        for (uint t = present; t < limitStating; t += HourInSeconds) {
+            uint scheduleIndex = scheduleMap[t];            
+            if (scheduleIndex != NotReserved) {
+                ScheduleInfo info = schedules[scheduleIndex];
+                address booker = info.booker();
+                if (info.booker() == msg.sender) {
+                    count++;
+                }
+            }
+        }
+        mySchedules = new ScheduleInfo[count];
+    }
+
     function getScheduleIndex(uint _startTimestamp) public view returns (uint) {
-        require(_startTimestamp % 3600 == 0, "_startTimestamp should point at the starting of each hour");
+        require(_startTimestamp % HourInSeconds == 0, "_startTimestamp should point at the starting of each hour");
         return scheduleMap[_startTimestamp];
     }
 
     function createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) public payable returns (uint256 scheduleIndex, ScheduleInfo info) {
         // check if timestamp is hour base
+        // check start time
         require(_startTimestamp >= block.timestamp, "_startTimestamp should not be past time.");
-        require(_startTimestamp % 3600 == 0, "_startTimestamp should point at starting of each hour.");
+        require(_startTimestamp % HourInSeconds == 0, "_startTimestamp should point at starting of each hour.");
+        uint timestampLimit = getEarliestStartingHourTimestamp() + createScheduleLimitSeconds;
+        require(_startTimestamp < timestampLimit, "Too much future time. Check the limit of seconds with getCreateScheduleLimitSeconds()");
+
+        // check end time
         if (_endTimestamp == 0)
-            _endTimestamp = _startTimestamp + 3600;
+            _endTimestamp = _startTimestamp + HourInSeconds;
         else
-            require(_endTimestamp % 3600 == 0, "_endTimestamp should point at the starting of each hour.");
+            require(_endTimestamp % HourInSeconds == 0, "_endTimestamp should point at the starting of each hour.");
         require(_startTimestamp < _endTimestamp, "_startTimestamp should be earlier than _endTimpstamp.");
 
-        uint hourCount = (_endTimestamp - _startTimestamp) / 3600;
+        // check sent ETH amount
+        uint hourCount = (_endTimestamp - _startTimestamp) / HourInSeconds;
         uint feePerHour = getFeePerHour();
         uint totalFee = hourCount * feePerHour;
         uint value = msg.value;
@@ -126,40 +171,23 @@ contract SceneSchedule is Ownable {
             revert("ETH amount is too much to create schedule for given period.");
 
 
-        for (uint t = _startTimestamp; t < _endTimestamp ; t += 3600) {
+        // check if time slot is avaiable
+        for (uint t = _startTimestamp; t < _endTimestamp ; t += HourInSeconds) {
             require(NotReserved == scheduleMap[t], "There's already reserved time.") ;
         }
 
+        // execute creating schedule
         info = new ScheduleInfo(_startTimestamp, _endTimestamp, msg.sender, _data);
         schedules.push(info);
         scheduleIndex = schedules.length - 1;
 
-        for (uint t = _startTimestamp; t < _endTimestamp ; t += 3600) {
+        for (uint t = _startTimestamp; t < _endTimestamp ; t += HourInSeconds) {
             scheduleMap[t] = scheduleIndex;
         }
 
         (bool ret, ) = payable(address(this)).call{value: msg.value}("");
-        require(ret, "failed to send ETH to contract");
+        require(ret, "Failed to send ETH to contract");
 
         return (scheduleIndex, info);
     }
-
-    /*
-    function createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) external payable returns (uint256 scheduleIndex, ScheduleInfo info) {
-        return createSchedule_(_startTimestamp, _endTimestamp, _data);
-    }
-
-    function test_createSchedule() public payable returns (uint256 scheduleIndex, ScheduleInfo info) {
-        // create schedule 
-        uint timestampNow = block.timestamp;
-        uint remainder = timestampNow % 3600;
-        uint earliestStartTime = timestampNow - remainder + 3600;
-        uint earliestEndTime = earliestStartTime + 3600;
-        require(msg.value == 3600, "Need value: 3600 Wei.");
-        createSchedule_(earliestStartTime, earliestEndTime, "...");
-
-        // try again
-
-    }
-    */
 }

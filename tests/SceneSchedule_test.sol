@@ -87,13 +87,50 @@ contract TestSceneSchedule is SceneSchedule {
         string memory data = "...";
         (uint256 scheduleIndex, ScheduleInfo info) = createSchedule(earliestStartTime, earliestEndTime, data);
         scheduleInfo = info;
-        Assert.ok(scheduleIndex != NotReserved, "scheduleIndex != NotReserved");
+        Assert.ok(scheduleIndex != NotReserved, "scheduleIndex != sceneSchedule.getNotReserved()");
+
+        // test getMySchedule
+        //ScheduleInfo[] = getMySchedule();
     }
 
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /// FAIL TEST START!!! //////////////////////////////////////////////////////////////////////////////////////////////////////////
+    /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+    function shouldFail_start() public {        
+        Assert.ok(false, "=== Fail Test Start from here!!! ===");
+    }
+
+    /// #sender: account-1
+    function shouldFail_setFeeNotByOwner() public {
+        setFee(2);
+        Assert.ok(true, "??");
+    }
+
+    /// #sender: account-1
+    function shouldFail_setCreateScheduleLimitSeconds() public {
+        setCreateScheduleLimitSeconds(1);
+        Assert.ok(true, "??");
+    }
+
+    /// #sender: account-0
+    /// #value: 3600
     function shouldFail_createScheduleOnReservedTime() public payable {
         // expected to fail when trying to create schedule on the time slot already reserved.
         string memory data = "...";
         createSchedule(scheduleInfo.startTimestamp(), scheduleInfo.endTimestamp(), data);
+        Assert.ok(true, "??");
+    }
+
+    /// #sender: account-0
+    /// #value: 3600
+    function shouldFail_createScheduleOn31dayAfter() public payable {
+        uint timestampNow = block.timestamp;
+        uint remainder = timestampNow % 3600;
+        uint earliestStartTime = timestampNow - remainder + 3600;
+        uint days30 = 60 * 60 * 24 * 30;
+        uint startTimeAfter30days = earliestStartTime + days30;
+        createSchedule(startTimeAfter30days, 0, "");
+        Assert.ok(true, "??");
     }
 }
     
