@@ -15,7 +15,7 @@ import "../SceneSchedule.sol";
 contract TestSceneSchedule is SceneSchedule {
 
     uint createdScheduleIndex;
-    //SceneSchedule sceneSchedule;
+    ScheduleInfo scheduleInfo;
 
     /// 'beforeAll' runs before all other tests
     /// More special functions are: 'beforeEach', 'beforeAll', 'afterEach' & 'afterAll'
@@ -72,7 +72,7 @@ contract TestSceneSchedule is SceneSchedule {
     /// Custom Transaction Context: https://remix-ide.readthedocs.io/en/latest/unittesting.html#customization
     /// #sender: account-0
     /// #value: 3600
-    function checkSenderAndValue() public payable {
+    function checkSenderAndValue_createSchedule() public payable {
         // account index varies 0-9, value is in wei
         Assert.equal(msg.sender, TestsAccounts.getAccount(0), "Invalid sender");
         Assert.equal(msg.value, 3600, "Invalid value");
@@ -85,11 +85,15 @@ contract TestSceneSchedule is SceneSchedule {
         uint earliestEndTime = 0;
         //string memory data = "{msg:'test'}";
         string memory data = "...";
-        (uint256 scheduleIndex, ) = createSchedule(earliestStartTime, earliestEndTime, data);
+        (uint256 scheduleIndex, ScheduleInfo info) = createSchedule(earliestStartTime, earliestEndTime, data);
+        scheduleInfo = info;
         Assert.ok(scheduleIndex != NotReserved, "scheduleIndex != NotReserved");
+    }
 
-        // try to create schedule on the same time slot
-
+    function shouldFail_createScheduleOnReservedTime() public payable {
+        // expected to fail when trying to create schedule on the time slot already reserved.
+        string memory data = "...";
+        createSchedule(scheduleInfo.startTimestamp(), scheduleInfo.endTimestamp(), data);
     }
 }
     
