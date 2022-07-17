@@ -86,7 +86,7 @@ contract TestSceneSchedule is SceneSchedule {
         //string memory data = "{msg:'test'}";
         string memory data = "...";
         (uint256 scheduleIndex, ) = createSchedule(earliestStartTime, earliestEndTime, data);
-        //Assert.ok(scheduleIndex != sceneSchedule.getNotReserved(), "scheduleIndex != sceneSchedule.getNotReserved()");
+        Assert.ok(scheduleIndex != NotReserved, "scheduleIndex != NotReserved");
 
         // try to create schedule on the same time slot
 
