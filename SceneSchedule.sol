@@ -116,10 +116,13 @@ contract SceneSchedule is Ownable {
         require(_startTimestamp < _endTimestamp, "_startTimestamp should be earlier than _endTimpstamp.");
 
         uint hourCount = (_endTimestamp - _startTimestamp) / 3600;
+        uint feePerHour = getFeePerHour();
+        uint totalFee = hourCount * feePerHour;
+        uint value = msg.value;
 
-        if (msg.value < hourCount * getFeePerHour())
+        if (value < totalFee)
             revert("ETH amount is not enough to create schedule for given period.");
-        else if (msg.value > hourCount * getFeePerHour())
+        else if (value > totalFee)
             revert("ETH amount is too much to create schedule for given period.");
 
 

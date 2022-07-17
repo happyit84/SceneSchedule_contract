@@ -12,13 +12,18 @@ import "remix_accounts.sol";
 import "../SceneSchedule.sol";
 
 // File name has to end with '_test.sol', this file can contain more than one testSuite contracts
-contract testSuite {
+contract TestSceneSchedule is SceneSchedule {
+
+    uint createdScheduleIndex;
+    //SceneSchedule sceneSchedule;
 
     /// 'beforeAll' runs before all other tests
     /// More special functions are: 'beforeEach', 'beforeAll', 'afterEach' & 'afterAll'
-    function beforeAll() public {
+    function beforeAll() public {        
         // <instantiate contract>
         Assert.equal(uint(1), uint(1), "1 should be equal to 1");
+        //sceneSchedule = new SceneSchedule();
+        createdScheduleIndex = NotReserved;
     }
 
     function beforeEach() public {
@@ -34,13 +39,18 @@ contract testSuite {
     }
 
     function testFeeCache() public {
-        FeeCache fee = new FeeCache();
-        Assert.equal(fee.getFeePerSecond(), uint256(1), "Initial Fee per second should be 1 wei.");
-        fee.setFee(10);
-        Assert.equal(fee.getFeePerSecond(), uint256(10), "Fee per second should be 10 wei.");
-        Assert.equal(fee.getFeePerMinute(), uint256(600), "Fee per minute should be 600 wei.");
-        Assert.equal(fee.getFeePerHour(), uint256(36000), "Fee per hour should be 36000 wei.");
-        Assert.equal(fee.getFeePerDay(), uint256(864000), "Fee per day should be 864000 wei.");
+        //FeeCache fee = new FeeCache();
+        Assert.equal(getFeePerSecond(), uint256(1), "Initial Fee per second should be 1 wei.");
+        setFee(10);
+        Assert.equal(getFeePerSecond(), uint256(10), "Fee per second should be 10 wei.");
+        Assert.equal(getFeePerMinute(), uint256(600), "Fee per minute should be 600 wei.");
+        Assert.equal(getFeePerHour(), uint256(36000), "Fee per hour should be 36000 wei.");
+        Assert.equal(getFeePerDay(), uint256(864000), "Fee per day should be 864000 wei.");
+        setFee(1);
+        Assert.equal(getFeePerSecond(), uint256(1), "Fee per second should be 10 wei.");
+        Assert.equal(getFeePerMinute(), uint256(60), "Fee per minute should be 600 wei.");
+        Assert.equal(getFeePerHour(), uint256(3600), "Fee per hour should be 36000 wei.");
+        Assert.equal(getFeePerDay(), uint256(86400), "Fee per day should be 864000 wei.");
     }
 
     function checkSuccess() public {
@@ -60,12 +70,26 @@ contract testSuite {
     }
 
     /// Custom Transaction Context: https://remix-ide.readthedocs.io/en/latest/unittesting.html#customization
-    /// #sender: account-1
-    /// #value: 100
+    /// #sender: account-0
+    /// #value: 3600
     function checkSenderAndValue() public payable {
         // account index varies 0-9, value is in wei
-        Assert.equal(msg.sender, TestsAccounts.getAccount(1), "Invalid sender");
-        Assert.equal(msg.value, 100, "Invalid value");
+        Assert.equal(msg.sender, TestsAccounts.getAccount(0), "Invalid sender");
+        Assert.equal(msg.value, 3600, "Invalid value");
+
+        // create schedule
+        uint timestampNow = block.timestamp;
+        uint remainder = timestampNow % 3600;
+        uint earliestStartTime = timestampNow - remainder + 3600;
+        //uint earliestEndTime = earliestStartTime + 3600;
+        uint earliestEndTime = 0;
+        //string memory data = "{msg:'test'}";
+        string memory data = "...";
+        (uint256 scheduleIndex, ) = createSchedule(earliestStartTime, earliestEndTime, data);
+        //Assert.ok(scheduleIndex != sceneSchedule.getNotReserved(), "scheduleIndex != sceneSchedule.getNotReserved()");
+
+        // try to create schedule on the same time slot
+
     }
 }
     
