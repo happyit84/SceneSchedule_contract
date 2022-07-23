@@ -61,6 +61,7 @@ contract SceneSchedule is Ownable {
     uint constant HourInSeconds = MinuteInSeconds * 60;
     uint constant DayInSeconds = HourInSeconds * 24;
     uint private createScheduleLimitSeconds; // from present point only can create schedule within this value of seconds in the future
+    uint private getMySchedulesLimitSeconds;
 
     constructor() payable {
         fee = new FeeCache();
@@ -68,7 +69,8 @@ contract SceneSchedule is Ownable {
         // add dummy info at the index=0, to use index 0 as NotReserved
         ScheduleInfo dummyInfo = new ScheduleInfo(0, 0, address(0), "");
         schedules.push(dummyInfo);
-        createScheduleLimitSeconds = 30 * 24 * 60 * 60; // 30 days
+        createScheduleLimitSeconds = DayInSeconds * 30; // 30 days
+        getMySchedulesLimitSeconds = DayInSeconds * 7; // 7 days
     }
 
     receive() external payable {} // need payable keyword to get ETH
@@ -119,24 +121,39 @@ contract SceneSchedule is Ownable {
         return earliestStartTime;
     }
 
-    function getMySchedule() public view returns (ScheduleInfo[] memory) {
-        uint earliestStarting = getEarliestStartingHourTimestamp();
-        uint present = earliestStarting - HourInSeconds;
-        uint limitStating = earliestStarting + createScheduleLimitSeconds;
+    function getMySchedules(uint searchStartTimestamp, uint searchEndTimestamp) public view returns (ScheduleInfo[] memory mySchedules) {        
+        require(searchStartTimestamp % HourInSeconds == 0, "searchStartTimpstamp should point at the starting of an hour.");
+        if (searchEndTimestamp == 0)
+            searchEndTimestamp = searchStartTimestamp + DayInSeconds*7;
+        require(searchEndTimestamp % HourInSeconds == 0, "searchEndTimestamp should point at the starting of an hour.");
+        require(searchStartTimestamp < searchEndTimestamp, "searchStarTimestamp should be earlier than searchEndTimestamp.");
+        require(searchEndTimestamp - searchStartTimestamp <= getMySchedulesLimitSeconds, "Search range is too broad. searchEndTimestamp - searchStartTimestamp should not be greater than 7 days.");
 
-        ScheduleInfo [] memory mySchedules;
+        uint cacheSize = (searchEndTimestamp - searchStartTimestamp) / HourInSeconds + 1;
+        uint [] memory myScheduleStartings = new uint[](cacheSize);
         uint count = 0;
-        for (uint t = present; t < limitStating; t += HourInSeconds) {
+        // calculate size of return array and cache the starting time of my schedules
+        for (uint t = searchStartTimestamp; t < searchEndTimestamp; t += HourInSeconds) {
             uint scheduleIndex = scheduleMap[t];            
             if (scheduleIndex != NotReserved) {
                 ScheduleInfo info = schedules[scheduleIndex];
-                address booker = info.booker();
                 if (info.booker() == msg.sender) {
-                    count++;
+                    myScheduleStartings[count] = t;
+                    count++;                    
                 }
             }
         }
-        mySchedules = new ScheduleInfo[count];
+   
+        mySchedules = new ScheduleInfo[](count);
+
+        // fill the array for return
+        for (uint i = 0; i < count; i++) {
+            uint t = myScheduleStartings[i];
+            uint scheduleIndex = scheduleMap[t];
+            mySchedules[i] = schedules[scheduleIndex];
+        }
+
+        return mySchedules;
     }
 
     function getScheduleIndex(uint _startTimestamp) public view returns (uint) {

@@ -90,13 +90,17 @@ contract TestSceneSchedule is SceneSchedule {
         Assert.ok(scheduleIndex != NotReserved, "scheduleIndex != sceneSchedule.getNotReserved()");
 
         // test getMySchedule
-        //ScheduleInfo[] = getMySchedule();
+        ScheduleInfo[] memory mySchedules = getMySchedules(earliestStartTime - 3600, earliestStartTime + 3600*24);
+        ScheduleInfo info2 = mySchedules[0];
+        Assert.equal(mySchedules.length, 1, "Length of schedule array returned from getMySchedule() should be 1.");
+        Assert.ok(info2.startTimestamp() == earliestStartTime, "The start timestamp of the schedule retured by getMySchedules() is different from the expected.");
+        Assert.equal(info2.endTimestamp(), earliestStartTime + 3600, "The end timestamp of the schdule returned by getMySchedules() is different from the expected.");        
     }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /// FAIL TEST START!!! //////////////////////////////////////////////////////////////////////////////////////////////////////////
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-    function shouldFail_start() public {        
+    /*function shouldFail_start() public {        
         Assert.ok(false, "=== Fail Test Start from here!!! ===");
     }
 
@@ -131,6 +135,6 @@ contract TestSceneSchedule is SceneSchedule {
         uint startTimeAfter30days = earliestStartTime + days30;
         createSchedule(startTimeAfter30days, 0, "");
         Assert.ok(true, "??");
-    }
+    }*/
 }
     
