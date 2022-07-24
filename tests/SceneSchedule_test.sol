@@ -90,11 +90,72 @@ contract TestSceneSchedule is SceneSchedule {
         Assert.ok(scheduleIndex != NotReserved, "scheduleIndex != sceneSchedule.getNotReserved()");
 
         // test getMySchedule
-        ScheduleInfo[] memory mySchedules = getMySchedules(earliestStartTime - 3600, earliestStartTime + 3600*24);
+        ScheduleInfo[] memory mySchedules = getMySchedules(earliestStartTime - 3600, earliestStartTime + 3600 * 24);
         ScheduleInfo info2 = mySchedules[0];
         Assert.equal(mySchedules.length, 1, "Length of schedule array returned from getMySchedule() should be 1.");
         Assert.ok(info2.startTimestamp() == earliestStartTime, "The start timestamp of the schedule retured by getMySchedules() is different from the expected.");
         Assert.equal(info2.endTimestamp(), earliestStartTime + 3600, "The end timestamp of the schdule returned by getMySchedules() is different from the expected.");        
+    }
+    
+    /// #sender: account-1
+    function testGetSheduleWithOtherAccount1() public {
+        Assert.equal(msg.sender, TestsAccounts.getAccount(1), "Invalid sender");
+
+        // test getMySchedule
+        ScheduleInfo[] memory mySchedules = getMySchedules(scheduleInfo.startTimestamp(), scheduleInfo.startTimestamp() + 3600 * 24);
+        Assert.equal(mySchedules.length, 0, "Length of schedule array returned from getMySchedules() should be 0.");
+    }
+
+    /// #sender: account-1
+    function testGetSheduleWithOtherAccount2() public {
+        Assert.equal(msg.sender, TestsAccounts.getAccount(1), "Invalid sender");
+
+        // test getSchedules
+        ScheduleInfo[] memory schedules = getSchedules(scheduleInfo.startTimestamp(), scheduleInfo.startTimestamp() + 3600 * 24);
+        Assert.equal(schedules.length, 1, "Length of schedule array returned from getSchedules() should be 1.");
+        Assert.equal(scheduleInfo.startTimestamp(), schedules[0].startTimestamp(), "The start timestamp of the schedule retured by getSchedules() is different from the expected.");
+        Assert.equal(scheduleInfo.endTimestamp(), schedules[0].endTimestamp(), "The end timestamp of the schdule returned by getSchedules() is different from the expected.");
+        Assert.equal(schedules[0].booker(), address(0), "The booker of other's schedule should be invisible.");
+        Assert.equal(schedules[0].data(), "", "The data of other's schedule should be invisible.");
+    }
+
+    /// #sender: account-0
+    function testGetMyShedule2_1() public {
+        Assert.equal(msg.sender, TestsAccounts.getAccount(0), "Invalid sender");
+
+        // test getMySchedule
+        ScheduleInfo[] memory mySchedules = getMySchedules(scheduleInfo.startTimestamp(), scheduleInfo.startTimestamp() + 3600 * 24);
+        Assert.equal(mySchedules.length, 1, "Length of schedule array returned from getMySchedules() should be 1.");
+        Assert.equal(scheduleInfo.startTimestamp(), mySchedules[0].startTimestamp(), "The start timestamp of the schedule retured by getSchedules() is different from the expected.");
+        Assert.equal(scheduleInfo.endTimestamp(), mySchedules[0].endTimestamp(), "The end timestamp of the schdule returned by getSchedules() is different from the expected.");
+        Assert.equal(mySchedules[0].booker(), msg.sender, "The booker of other's schedule should be invisible.");
+        Assert.equal(mySchedules[0].data(), scheduleInfo.data(), "The data of other's schedule should be invisible.");
+    }
+    
+    /// #sender: account-0
+    function testGetMySchedule2_2() public {
+        Assert.equal(msg.sender, TestsAccounts.getAccount(0), "Invalid sender");
+
+        // test getSchedules
+        ScheduleInfo[] memory schedules = getSchedules(scheduleInfo.startTimestamp(), scheduleInfo.startTimestamp() + 3600 * 24);
+        Assert.equal(schedules.length, 1, "Length of schedule array returned from getSchedules() should be 1.");
+        Assert.equal(scheduleInfo.startTimestamp(), schedules[0].startTimestamp(), "The start timestamp of the schedule retured by getSchedules() is different from the expected.");
+        Assert.equal(scheduleInfo.endTimestamp(), schedules[0].endTimestamp(), "The end timestamp of the schdule returned by getSchedules() is different from the expected.");
+        Assert.equal(schedules[0].booker(), msg.sender, "The booker of other's schedule should be invisible.");
+        Assert.equal(schedules[0].data(), scheduleInfo.data(), "The data of other's schedule should be invisible.");
+    }
+
+    /// #sender: account-1
+    function testGetscheduleNow() public {
+        Assert.equal(msg.sender, TestsAccounts.getAccount(1), "Invalid sender");
+        (bool scheduleExist, ScheduleInfo presentScheduleInfo) = getScheduleNow();
+        if (scheduleExist)
+        {
+            Assert.ok(presentScheduleInfo.startTimestamp() == scheduleInfo.startTimestamp() &&
+                    presentScheduleInfo.endTimestamp() == scheduleInfo.endTimestamp() &&
+                    presentScheduleInfo.booker() == scheduleInfo.booker() &&
+                    keccak256(bytes(presentScheduleInfo.data())) == keccak256(bytes(scheduleInfo.data())), "Present schedule info is wrong.");                    
+        }   
     }
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

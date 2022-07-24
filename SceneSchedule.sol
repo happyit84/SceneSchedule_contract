@@ -50,6 +50,14 @@ contract ScheduleInfo {
         booker = _booker;
         data = _data;
     }
+
+    function setBooker(address _booker) public {
+        booker = _booker;
+    }
+
+    function setData(string memory _data) public {
+        data = _data;
+    }
 }
 
 contract SceneSchedule is Ownable {
@@ -63,6 +71,10 @@ contract SceneSchedule is Ownable {
     uint private createScheduleLimitSeconds; // from present point only can create schedule within this value of seconds in the future
     uint private getMySchedulesLimitSeconds;
 
+    uint constant PermissionAdmin = 0xffffffffffffffffffffffffffffffff;
+    uint constant PermissionReadSchedule = 0x1;
+    mapping(address => uint) permissionMap;
+
     constructor() payable {
         fee = new FeeCache();
 
@@ -71,6 +83,8 @@ contract SceneSchedule is Ownable {
         schedules.push(dummyInfo);
         createScheduleLimitSeconds = DayInSeconds * 30; // 30 days
         getMySchedulesLimitSeconds = DayInSeconds * 7; // 7 days
+        
+        permissionMap[owner()] = PermissionAdmin; // grant all the permission to owner
     }
 
     receive() external payable {} // need payable keyword to get ETH
@@ -114,14 +128,17 @@ contract SceneSchedule is Ownable {
         return NotReserved;
     }
 
-    function getEarliestStartingHourTimestamp() public view returns (uint) {
-        uint timestampNow = block.timestamp;
+    function getEarliestStartingHourTimestampWithPresentTimestamp() public view returns (uint earliestStartTime, uint timestampNow) {
+        timestampNow = block.timestamp;
         uint remainder = timestampNow % HourInSeconds;
-        uint earliestStartTime = timestampNow - remainder + HourInSeconds;
-        return earliestStartTime;
+        earliestStartTime = timestampNow - remainder + HourInSeconds;
     }
 
-    function getMySchedules(uint searchStartTimestamp, uint searchEndTimestamp) public view returns (ScheduleInfo[] memory mySchedules) {        
+    function getEarliestStartingHourTimestamp() public view returns (uint earliestStartTimestamp) {
+        (earliestStartTimestamp, ) = getEarliestStartingHourTimestampWithPresentTimestamp();
+    }
+
+    function _getSchedules(uint searchStartTimestamp, uint searchEndTimestamp, bool onlyMine) internal returns (ScheduleInfo[] memory mySchedules) {        
         require(searchStartTimestamp % HourInSeconds == 0, "searchStartTimpstamp should point at the starting of an hour.");
         if (searchEndTimestamp == 0)
             searchEndTimestamp = searchStartTimestamp + DayInSeconds*7;
@@ -137,9 +154,9 @@ contract SceneSchedule is Ownable {
             uint scheduleIndex = scheduleMap[t];            
             if (scheduleIndex != NotReserved) {
                 ScheduleInfo info = schedules[scheduleIndex];
-                if (info.booker() == msg.sender) {
+                if (onlyMine == false || info.booker() == msg.sender) {
                     myScheduleStartings[count] = t;
-                    count++;                    
+                    count++;
                 }
             }
         }
@@ -150,10 +167,38 @@ contract SceneSchedule is Ownable {
         for (uint i = 0; i < count; i++) {
             uint t = myScheduleStartings[i];
             uint scheduleIndex = scheduleMap[t];
-            mySchedules[i] = schedules[scheduleIndex];
+            ScheduleInfo info = schedules[scheduleIndex];
+
+            // return only if user has a permission to read other's schedule info
+            mySchedules[i] = new ScheduleInfo(info.startTimestamp(), info.endTimestamp(), address(0), "");
+            if (hasPermission(PermissionReadSchedule)) {
+                mySchedules[i].setBooker(info.booker());
+                mySchedules[i].setData(info.data());
+            }
         }
 
         return mySchedules;
+    }
+
+    function getSchedules(uint searchStartTimestamp, uint searchEndTimestamp) public returns (ScheduleInfo[] memory) {
+        return _getSchedules(searchStartTimestamp, searchEndTimestamp, false);
+    }
+
+    function getMySchedules(uint searchStartTimestamp, uint searchEndTimestamp) public returns (ScheduleInfo[] memory mySchedules) {
+        return _getSchedules(searchStartTimestamp, searchEndTimestamp, true);
+    }
+
+    function getPresentScheduleStartingTimestamp() public view returns (uint) {
+        uint timestampNow = block.timestamp;        
+        return timestampNow - (timestampNow % HourInSeconds);
+    }
+
+    function getScheduleNow() public view returns (bool scheduleExist, ScheduleInfo scheduleNow) {
+        uint presentScheduleStartTimestamp = getPresentScheduleStartingTimestamp();
+        uint scheduleIndex = scheduleMap[presentScheduleStartTimestamp];
+        if (NotReserved != scheduleMap[presentScheduleStartTimestamp])            
+            return (true, schedules[scheduleIndex]);
+        scheduleExist = false;
     }
 
     function getScheduleIndex(uint _startTimestamp) public view returns (uint) {
@@ -206,5 +251,13 @@ contract SceneSchedule is Ownable {
         require(ret, "Failed to send ETH to contract");
 
         return (scheduleIndex, info);
+    }
+
+    function getPermission() internal view returns (uint) {
+        return permissionMap[msg.sender];
+    }
+
+    function hasPermission(uint permission) internal view returns (bool) {
+        return getPermission() & permission == permission;
     }
 }
