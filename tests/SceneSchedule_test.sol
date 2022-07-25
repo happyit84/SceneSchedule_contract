@@ -16,6 +16,7 @@ contract TestSceneSchedule is SceneSchedule {
 
     uint createdScheduleIndex;
     ScheduleInfo scheduleInfo;
+    ScheduleInfo scheduleInfo2;
 
     /// 'beforeAll' runs before all other tests
     /// More special functions are: 'beforeEach', 'beforeAll', 'afterEach' & 'afterAll'
@@ -85,9 +86,8 @@ contract TestSceneSchedule is SceneSchedule {
         uint earliestEndTime = 0;
         //string memory data = "{msg:'test'}";
         string memory data = "...";
-        (uint256 scheduleIndex, ScheduleInfo info) = createSchedule(earliestStartTime, earliestEndTime, data);
-        scheduleInfo = info;
-        Assert.ok(scheduleIndex != NotReserved, "scheduleIndex != sceneSchedule.getNotReserved()");
+        scheduleInfo = createSchedule(earliestStartTime, earliestEndTime, data);        
+        Assert.ok(scheduleInfo.id() != NotReserved, "scheduleIndex != sceneSchedule.getNotReserved()");
 
         // test getMySchedule
         ScheduleInfo[] memory mySchedules = getMySchedules(earliestStartTime - 3600, earliestStartTime + 3600 * 24);
@@ -157,6 +157,26 @@ contract TestSceneSchedule is SceneSchedule {
                     keccak256(bytes(presentScheduleInfo.data())) == keccak256(bytes(scheduleInfo.data())), "Present schedule info is wrong.");                    
         }   
     }
+
+    function testModifySchedule() public {             
+        uint newStartTime = scheduleInfo.startTimestamp() + 3600;
+        uint newEndTime = scheduleInfo.endTimestamp() + 3600;
+        scheduleInfo2 = modifySchedule(scheduleInfo.id(), newStartTime, newEndTime, scheduleInfo.data());
+        ScheduleInfo[] memory mySchedules = getMySchedules(scheduleInfo2.startTimestamp(), scheduleInfo2.endTimestamp());
+
+        Assert.equal(mySchedules[0].id(), scheduleInfo2.id(), "wrong id of modified schedule");
+        Assert.equal(mySchedules[0].startTimestamp(), scheduleInfo2.startTimestamp(), "wrong startTimestamp of modified schedule");
+        Assert.equal(mySchedules[0].endTimestamp(), scheduleInfo2.endTimestamp(), "wrong endTimestamp of modifed schedule");
+    }
+
+    // NOT IMPLEMENTED YET
+    function testRemoveSchedule() public {
+        // remove schedule
+
+        // should not be returned by getSchedules
+    }
+
+    
 
     /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
     /// FAIL TEST START!!! //////////////////////////////////////////////////////////////////////////////////////////////////////////

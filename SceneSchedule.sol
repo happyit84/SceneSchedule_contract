@@ -39,16 +39,25 @@ contract FeeCache {
 }
 
 contract ScheduleInfo {
-    uint public startTimestamp; // inclusive
-    uint public endTimestamp; // exclusive
-    address public booker;
+    uint constant InvalidId = 0;
+    uint public id = InvalidId;
+    uint public startTimestamp = 0; // inclusive
+    uint public endTimestamp = 0; // exclusive
+    address public booker = address(0);
     string public data;
+    bool public removed = false;
 
-    constructor (uint _startTimestamp, uint _endTimestamp, address _booker, string memory _data) {
+    constructor (uint _id, uint _startTimestamp, uint _endTimestamp, address _booker, string memory _data) {
+        id = _id;
         startTimestamp = _startTimestamp;
         endTimestamp = _endTimestamp;
         booker = _booker;
         data = _data;
+        removed = false;
+    }
+
+    function remove() public {
+        removed = true;
     }
 
     function setBooker(address _booker) public {
@@ -57,6 +66,11 @@ contract ScheduleInfo {
 
     function setData(string memory _data) public {
         data = _data;
+    }
+
+    function isValid() public view returns (bool) {
+        return id == InvalidId;
+        //return (startTimestamp != 0 && endTimestamp != 0 && startTimestamp % 3600 == 0 && endTimestamp % 3600 == 0 && startTimestamp < endTimestamp);
     }
 }
 
@@ -72,14 +86,15 @@ contract SceneSchedule is Ownable {
     uint private getMySchedulesLimitSeconds;
 
     uint constant PermissionAdmin = 0xffffffffffffffffffffffffffffffff;
-    uint constant PermissionReadSchedule = 0x1;
+    uint constant PermissionReadOthersSchedule = 0x1;
+    uint constant PermissionRemoveOthersSchedule = 0x2;
     mapping(address => uint) permissionMap;
 
     constructor() payable {
         fee = new FeeCache();
 
         // add dummy info at the index=0, to use index 0 as NotReserved
-        ScheduleInfo dummyInfo = new ScheduleInfo(0, 0, address(0), "");
+        ScheduleInfo dummyInfo = new ScheduleInfo(0, 0, 0, address(0), "");
         schedules.push(dummyInfo);
         createScheduleLimitSeconds = DayInSeconds * 30; // 30 days
         getMySchedulesLimitSeconds = DayInSeconds * 7; // 7 days
@@ -170,8 +185,8 @@ contract SceneSchedule is Ownable {
             ScheduleInfo info = schedules[scheduleIndex];
 
             // return only if user has a permission to read other's schedule info
-            mySchedules[i] = new ScheduleInfo(info.startTimestamp(), info.endTimestamp(), address(0), "");
-            if (hasPermission(PermissionReadSchedule)) {
+            mySchedules[i] = new ScheduleInfo(info.id(), info.startTimestamp(), info.endTimestamp(), address(0), "");
+            if (hasPermission(PermissionReadOthersSchedule)) {
                 mySchedules[i].setBooker(info.booker());
                 mySchedules[i].setData(info.data());
             }
@@ -206,7 +221,7 @@ contract SceneSchedule is Ownable {
         return scheduleMap[_startTimestamp];
     }
 
-    function createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) public payable returns (uint256 scheduleIndex, ScheduleInfo info) {
+    function createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) public payable returns (ScheduleInfo info) {
         // check if timestamp is hour base
         // check start time
         require(_startTimestamp >= block.timestamp, "_startTimestamp should not be past time.");
@@ -239,18 +254,19 @@ contract SceneSchedule is Ownable {
         }
 
         // execute creating schedule
-        info = new ScheduleInfo(_startTimestamp, _endTimestamp, msg.sender, _data);
+        info = new ScheduleInfo(schedules.length, _startTimestamp, _endTimestamp, msg.sender, _data);
         schedules.push(info);
-        scheduleIndex = schedules.length - 1;
+        require(schedules[schedules.length-1].id() == schedules.length-1, "new schedule id should be the same as the index in schedules array.");
 
         for (uint t = _startTimestamp; t < _endTimestamp ; t += HourInSeconds) {
-            scheduleMap[t] = scheduleIndex;
+            scheduleMap[t] = info.id();
         }
+        
 
         (bool ret, ) = payable(address(this)).call{value: msg.value}("");
         require(ret, "Failed to send ETH to contract");
 
-        return (scheduleIndex, info);
+        return info;
     }
 
     function getPermission() internal view returns (uint) {
@@ -259,5 +275,25 @@ contract SceneSchedule is Ownable {
 
     function hasPermission(uint permission) internal view returns (bool) {
         return getPermission() & permission == permission;
+    }
+
+    function modifySchedule(uint scheduleIndex, uint newStartTimestamp, uint newEndTimestamp, string memory newData) 
+        public payable returns (ScheduleInfo newScheduleInfo)
+    {
+        removeSchedule(scheduleIndex);
+        return createSchedule(newStartTimestamp, newEndTimestamp, newData);
+    }
+
+    function removeSchedule(uint scheduleIndex) public {
+        ScheduleInfo info = schedules[scheduleIndex];
+        require(info.isValid(), "You can remove only valid schedules.");
+        require(info.removed(), "You can't remove the schedule already removed.");
+        require(msg.sender == info.booker() || hasPermission(PermissionRemoveOthersSchedule), "No permission to remove given schedule.");
+
+        for (uint t = info.startTimestamp(); t < info.endTimestamp(); t += HourInSeconds) {
+            require(scheduleMap[t] == scheduleIndex, "The time is not occupied by this schedule.");
+            scheduleMap[t] = NotReserved;
+        }
+        info.remove();
     }
 }
