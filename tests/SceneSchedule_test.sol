@@ -154,19 +154,39 @@ contract TestSceneSchedule is SceneSchedule {
             Assert.ok(presentScheduleInfo.startTimestamp() == scheduleInfo.startTimestamp() &&
                     presentScheduleInfo.endTimestamp() == scheduleInfo.endTimestamp() &&
                     presentScheduleInfo.booker() == scheduleInfo.booker() &&
-                    keccak256(bytes(presentScheduleInfo.data())) == keccak256(bytes(scheduleInfo.data())), "Present schedule info is wrong.");                    
+                    keccak256(bytes(presentScheduleInfo.data())) == keccak256(bytes(scheduleInfo.data())), "Present schedule info is wrong.");
         }   
     }
 
-    function testModifySchedule() public {             
+    /// #sender: account-0
+    /// #value: 3600
+    function testModifySchedule() public payable {
+        Assert.equal(msg.sender, TestsAccounts.getAccount(0), "Invalid sender");
+        Assert.equal(msg.value, 3600, "Invalid value");
         uint newStartTime = scheduleInfo.startTimestamp() + 3600;
         uint newEndTime = scheduleInfo.endTimestamp() + 3600;
-        scheduleInfo2 = modifySchedule(scheduleInfo.id(), newStartTime, newEndTime, scheduleInfo.data());
+        scheduleInfo2 = modifySchedule(scheduleInfo.id(), newStartTime, newEndTime, scheduleInfo.data());//
         ScheduleInfo[] memory mySchedules = getMySchedules(scheduleInfo2.startTimestamp(), scheduleInfo2.endTimestamp());
 
         Assert.equal(mySchedules[0].id(), scheduleInfo2.id(), "wrong id of modified schedule");
         Assert.equal(mySchedules[0].startTimestamp(), scheduleInfo2.startTimestamp(), "wrong startTimestamp of modified schedule");
         Assert.equal(mySchedules[0].endTimestamp(), scheduleInfo2.endTimestamp(), "wrong endTimestamp of modifed schedule");
+    }
+
+    /// #sender: account-0
+    /// #value: 3600
+    function testModifyScheduleMoreTime() public payable {
+
+    }
+
+    function testModifyScheduleLessTime() public payable {
+        /// #sender: account-0
+    }
+
+    /// #sender: account-0
+    /// #value: 3600
+    function testModifyScheduleWithOtherAccount() public payable {
+
     }
 
     // NOT IMPLEMENTED YET

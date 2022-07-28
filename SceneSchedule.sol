@@ -46,6 +46,7 @@ contract ScheduleInfo {
     address public booker = address(0);
     string public data;
     bool public removed = false;
+    uint public paidEth = 0;
 
     constructor (uint _id, uint _startTimestamp, uint _endTimestamp, address _booker, string memory _data) {
         id = _id;
@@ -58,6 +59,11 @@ contract ScheduleInfo {
 
     function remove() public {
         removed = true;
+        paidEth = 0;
+    }
+
+    function getLengthInSeconds() public view returns (uint) {
+        return (endTimestamp - startTimestamp);
     }
 
     function setBooker(address _booker) public {
@@ -68,9 +74,12 @@ contract ScheduleInfo {
         data = _data;
     }
 
+    function setPaidEth(uint _paidEth) public {
+        paidEth = _paidEth;
+    }
+
     function isValid() public view returns (bool) {
-        return id == InvalidId;
-        //return (startTimestamp != 0 && endTimestamp != 0 && startTimestamp % 3600 == 0 && endTimestamp % 3600 == 0 && startTimestamp < endTimestamp);
+        return id != InvalidId;
     }
 }
 
@@ -84,6 +93,7 @@ contract SceneSchedule is Ownable {
     uint constant DayInSeconds = HourInSeconds * 24;
     uint private createScheduleLimitSeconds; // from present point only can create schedule within this value of seconds in the future
     uint private getMySchedulesLimitSeconds;
+    uint private changeScheduleLimitSeconds;
 
     uint constant PermissionAdmin = 0xffffffffffffffffffffffffffffffff;
     uint constant PermissionReadOthersSchedule = 0x1;
@@ -98,6 +108,7 @@ contract SceneSchedule is Ownable {
         schedules.push(dummyInfo);
         createScheduleLimitSeconds = DayInSeconds * 30; // 30 days
         getMySchedulesLimitSeconds = DayInSeconds * 7; // 7 days
+        changeScheduleLimitSeconds = DayInSeconds; // 24 hours
         
         permissionMap[owner()] = PermissionAdmin; // grant all the permission to owner
     }
@@ -121,6 +132,13 @@ contract SceneSchedule is Ownable {
     }
     function setCreateScheduleLimitSeconds(uint newValue) public onlyOwner {
         createScheduleLimitSeconds = newValue;
+    }
+
+    function getChangeScheduleLimitSeconds() public view returns (uint) {
+        return changeScheduleLimitSeconds;
+    }
+    function setChangeScheduleLimitSeconds(uint newValue) public onlyOwner {
+        changeScheduleLimitSeconds = newValue;
     }
 
     function getFeePerSecond() public view returns (uint256 weiPerSecond) {
@@ -221,7 +239,21 @@ contract SceneSchedule is Ownable {
         return scheduleMap[_startTimestamp];
     }
 
-    function createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) public payable returns (ScheduleInfo info) {
+    function createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) public payable returns (ScheduleInfo createdScheduleInfo) {
+        createdScheduleInfo = _createSchedule(_startTimestamp, _endTimestamp, _data);
+
+        // check sent ETH amount        
+        uint totalFee = createdScheduleInfo.getLengthInSeconds() * fee.getFeePerSecond();
+        if (msg.value < totalFee)
+            revert("ETH amount is not enough to create schedule for given period.");
+        else if (msg.value > totalFee)
+            revert("ETH amount is too much to create schedule for given period.");
+
+        (bool ret, ) = payable(address(this)).call{value: msg.value}("");
+        require(ret, "Failed to send ETH to contract");
+    }
+
+    function _createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) public returns (ScheduleInfo info) {
         // check if timestamp is hour base
         // check start time
         require(_startTimestamp >= block.timestamp, "_startTimestamp should not be past time.");
@@ -235,18 +267,6 @@ contract SceneSchedule is Ownable {
         else
             require(_endTimestamp % HourInSeconds == 0, "_endTimestamp should point at the starting of each hour.");
         require(_startTimestamp < _endTimestamp, "_startTimestamp should be earlier than _endTimpstamp.");
-
-        // check sent ETH amount
-        uint hourCount = (_endTimestamp - _startTimestamp) / HourInSeconds;
-        uint feePerHour = getFeePerHour();
-        uint totalFee = hourCount * feePerHour;
-        uint value = msg.value;
-
-        if (value < totalFee)
-            revert("ETH amount is not enough to create schedule for given period.");
-        else if (value > totalFee)
-            revert("ETH amount is too much to create schedule for given period.");
-
 
         // check if time slot is avaiable
         for (uint t = _startTimestamp; t < _endTimestamp ; t += HourInSeconds) {
@@ -262,10 +282,6 @@ contract SceneSchedule is Ownable {
             scheduleMap[t] = info.id();
         }
         
-
-        (bool ret, ) = payable(address(this)).call{value: msg.value}("");
-        require(ret, "Failed to send ETH to contract");
-
         return info;
     }
 
@@ -280,20 +296,53 @@ contract SceneSchedule is Ownable {
     function modifySchedule(uint scheduleIndex, uint newStartTimestamp, uint newEndTimestamp, string memory newData) 
         public payable returns (ScheduleInfo newScheduleInfo)
     {
-        removeSchedule(scheduleIndex);
-        return createSchedule(newStartTimestamp, newEndTimestamp, newData);
+        ScheduleInfo removedScheduleInfo = _removeSchedule(scheduleIndex);
+        newScheduleInfo = _createSchedule(newStartTimestamp, newEndTimestamp, newData);
+        
+        // check sent ETH amount
+        uint feeForCreate = newScheduleInfo.getLengthInSeconds() * fee.getFeePerSecond();
+        if (feeForCreate > removedScheduleInfo.paidEth()) {
+            uint ethToPay = feeForCreate - removedScheduleInfo.paidEth();
+            if (msg.value < ethToPay)
+                revert("ETH amount is not enough to create schedule for given period.");
+            else if (msg.value > ethToPay)
+                revert("ETH amount is too much to create schedule for given period.");
+
+            (bool ret, ) = payable(address(this)).call{value: ethToPay}("");
+            require(ret, "Failed to send ETH to contract");
+        }
+        else if (feeForCreate < removedScheduleInfo.paidEth()) {
+            uint ethToRefund = removedScheduleInfo.paidEth() - feeForCreate;
+            (bool ret, ) = payable(msg.sender).call{value: ethToRefund}("");
+            require(ret, "Failed to send back ETH to booker");            
+        }
+        newScheduleInfo.setPaidEth(feeForCreate);
+        removedScheduleInfo.setPaidEth(0);
     }
 
-    function removeSchedule(uint scheduleIndex) public {
+    function removeSchedule(uint scheduleId) public payable {
+        ScheduleInfo removedScheduleInfo = _removeSchedule(scheduleId);        
+        (bool ret, ) = payable(msg.sender).call{value: removedScheduleInfo.paidEth()}("");
+        require(ret, "Failed to send back ETH to booker");
+        removedScheduleInfo.setPaidEth(0);
+    }
+
+    function _removeSchedule(uint scheduleIndex) public returns (ScheduleInfo) {
         ScheduleInfo info = schedules[scheduleIndex];
         require(info.isValid(), "You can remove only valid schedules.");
-        require(info.removed(), "You can't remove the schedule already removed.");
+        require(info.removed() == false, "You can't remove the schedule already removed.");
         require(msg.sender == info.booker() || hasPermission(PermissionRemoveOthersSchedule), "No permission to remove given schedule.");
+        uint nowTimestamp = block.timestamp;
+        require(nowTimestamp < info.startTimestamp(), "schedule you want to remove should not be the past");
+        if (hasPermission(PermissionRemoveOthersSchedule) == false)
+            require(info.startTimestamp() - nowTimestamp > changeScheduleLimitSeconds, "You can't remove this schedule now.");
 
         for (uint t = info.startTimestamp(); t < info.endTimestamp(); t += HourInSeconds) {
             require(scheduleMap[t] == scheduleIndex, "The time is not occupied by this schedule.");
             scheduleMap[t] = NotReserved;
         }
         info.remove();
+
+        return info;
     }
 }
