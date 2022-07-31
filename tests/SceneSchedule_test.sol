@@ -16,7 +16,7 @@ contract TestSceneSchedule is SceneSchedule {
 
     uint createdScheduleIndex;
     ScheduleInfo [] testScheds;
-
+/*
     /// 'beforeAll' runs before all other tests
     /// More special functions are: 'beforeEach', 'beforeAll', 'afterEach' & 'afterAll'
     function beforeAll() public {        
@@ -68,42 +68,41 @@ contract TestSceneSchedule is SceneSchedule {
     function checkFailure() public {
         Assert.notEqual(uint(1), uint(2), "1 should not be equal to 2");
     }
-
+*/
     /// Custom Transaction Context: https://remix-ide.readthedocs.io/en/latest/unittesting.html#customization
     /// #sender: account-0
-    /// #value: 3600
-    function checkSenderAndValue_createSchedule() public payable {
+    /// #value: 7200
+    function testCreateSchedule() public payable {
         // account index varies 0-9, value is in wei
         Assert.equal(msg.sender, TestsAccounts.getAccount(0), "Invalid sender");
-        Assert.equal(msg.value, 3600, "Invalid value");
+        Assert.equal(msg.value, 7200, "Invalid value");
 
         // create schedule
         uint timestampNow = block.timestamp;
         uint remainder = timestampNow % 3600;
         uint earliestStartTime = timestampNow - remainder + 3600;
-        //uint earliestEndTime = earliestStartTime + 3600;
-        uint earliestEndTime = 0;
-        //string memory data = "{msg:'test'}";
+        uint earliestEndTime = earliestStartTime + 3600*2;
+
         string memory data = "...";
         ScheduleInfo info = createSchedule(earliestStartTime, earliestEndTime, data);
         testScheds.push(info);
         Assert.ok(info.id() != NotReserved, "scheduleIndex != sceneSchedule.getNotReserved()");
 
         // test getMySchedule
-        ScheduleInfo[] memory mySchedules = getMySchedules(earliestStartTime - 3600, earliestStartTime + 3600 * 24);
+        ScheduleInfo[] memory mySchedules = getMySchedules(earliestStartTime - 3600, earliestStartTime + 3600 * 4);
         ScheduleInfo info2 = mySchedules[0];
         Assert.equal(mySchedules.length, 1, "Length of schedule array returned from getMySchedule() should be 1.");
         Assert.ok(info2.startTimestamp() == earliestStartTime, "The start timestamp of the schedule retured by getMySchedules() is different from the expected.");
-        Assert.equal(info2.endTimestamp(), earliestStartTime + 3600, "The end timestamp of the schdule returned by getMySchedules() is different from the expected.");        
+        Assert.equal(info2.endTimestamp(), earliestEndTime, "The end timestamp of the schdule returned by getMySchedules() is different from the expected.");        
     }
-    
+/*
     /// #sender: account-1
     function testGetSheduleWithOtherAccount1() public {
         Assert.equal(msg.sender, TestsAccounts.getAccount(1), "Invalid sender");
 
         // test getMySchedule
         ScheduleInfo testInfo = testScheds[testScheds.length-1];
-        ScheduleInfo[] memory mySchedules = getMySchedules(testInfo.startTimestamp(), testInfo.startTimestamp() + 3600 * 24);
+        ScheduleInfo[] memory mySchedules = getMySchedules(testInfo.startTimestamp(), testInfo.startTimestamp() + 3600 * 4);
         Assert.equal(mySchedules.length, 0, "Length of schedule array returned from getMySchedules() should be 0.");
     }
 
@@ -113,7 +112,7 @@ contract TestSceneSchedule is SceneSchedule {
 
         // test getSchedules
         ScheduleInfo testInfo = testScheds[testScheds.length-1];
-        ScheduleInfo[] memory schedules = getSchedules(testInfo.startTimestamp(), testInfo.startTimestamp() + 3600 * 24);
+        ScheduleInfo[] memory schedules = getSchedules(testInfo.startTimestamp(), testInfo.startTimestamp() + 3600 * 4);
         Assert.equal(schedules.length, 1, "Length of schedule array returned from getSchedules() should be 1.");
         Assert.equal(testInfo.startTimestamp(), schedules[0].startTimestamp(), "The start timestamp of the schedule retured by getSchedules() is different from the expected.");
         Assert.equal(testInfo.endTimestamp(), schedules[0].endTimestamp(), "The end timestamp of the schdule returned by getSchedules() is different from the expected.");
@@ -127,7 +126,7 @@ contract TestSceneSchedule is SceneSchedule {
 
         // test getMySchedule
         ScheduleInfo testInfo = testScheds[testScheds.length-1];
-        ScheduleInfo[] memory mySchedules = getMySchedules(testInfo.startTimestamp(), testInfo.startTimestamp() + 3600 * 24);
+        ScheduleInfo[] memory mySchedules = getMySchedules(testInfo.startTimestamp(), testInfo.startTimestamp() + 3600 * 4);
         Assert.equal(mySchedules.length, 1, "Length of schedule array returned from getMySchedules() should be 1.");
         Assert.equal(testInfo.startTimestamp(), mySchedules[0].startTimestamp(), "The start timestamp of the schedule retured by getSchedules() is different from the expected.");
         Assert.equal(testInfo.endTimestamp(), mySchedules[0].endTimestamp(), "The end timestamp of the schdule returned by getSchedules() is different from the expected.");
@@ -141,7 +140,7 @@ contract TestSceneSchedule is SceneSchedule {
 
         // test getSchedules
         ScheduleInfo testInfo = testScheds[testScheds.length-1];
-        ScheduleInfo[] memory schedules = getSchedules(testInfo.startTimestamp(), testInfo.startTimestamp() + 3600 * 24);
+        ScheduleInfo[] memory schedules = getSchedules(testInfo.startTimestamp(), testInfo.startTimestamp() + 3600 * 4);
         Assert.equal(schedules.length, 1, "Length of schedule array returned from getSchedules() should be 1.");
         Assert.equal(testInfo.startTimestamp(), schedules[0].startTimestamp(), "The start timestamp of the schedule retured by getSchedules() is different from the expected.");
         Assert.equal(testInfo.endTimestamp(), schedules[0].endTimestamp(), "The end timestamp of the schdule returned by getSchedules() is different from the expected.");
@@ -162,12 +161,12 @@ contract TestSceneSchedule is SceneSchedule {
                     keccak256(bytes(presentScheduleInfo.data())) == keccak256(bytes(testInfo.data())), "Present schedule info is wrong.");
         }   
     }
-
+*/
     /// #sender: account-0
-    /// #value: 3600
+    /// #value: 0
     function testModifySchedule() public payable {
         Assert.equal(msg.sender, TestsAccounts.getAccount(0), "Invalid sender");
-        Assert.equal(msg.value, 3600, "Invalid value");
+        Assert.equal(msg.value, 0, "Invalid value");
 
         ScheduleInfo testInfo = testScheds[testScheds.length-1];
         uint newStartTime = testInfo.startTimestamp() + 3600;
@@ -198,21 +197,53 @@ contract TestSceneSchedule is SceneSchedule {
         Assert.equal(mySchedules[0].endTimestamp(), newEndTime, "wrong endTimestamp of modifed schedule");
     }
 
+    /// #sender: account-0
+    /// #value: 0
     function testModifyScheduleLessTime() public payable {
-        /// #sender: account-0
+        Assert.equal(msg.sender, TestsAccounts.getAccount(0), "Invalid sender");
+        Assert.equal(msg.value, 0, "Invalid value");
+
+        uint balanceBefore = address(msg.sender).balance;
+
+        ScheduleInfo testInfo = testScheds[testScheds.length-1];
+        uint newStartTime = testInfo.startTimestamp() + 3600;
+        uint newEndTime = testInfo.endTimestamp();
+        ScheduleInfo modifiedSched = modifySchedule(testInfo.id(), newStartTime, newEndTime, testInfo.data());
+        testScheds.push(modifiedSched);
+        ScheduleInfo[] memory mySchedules = getMySchedules(modifiedSched.startTimestamp(), modifiedSched.endTimestamp());
+        Assert.equal(mySchedules[0].id(), modifiedSched.id(), "wrong id of modified schedule");
+        Assert.equal(mySchedules[0].startTimestamp(), newStartTime, "wrong startTimestamp of modified schedule");
+        Assert.equal(mySchedules[0].endTimestamp(), newEndTime, "wrong endTimestamp of modifed schedule");
+
+        uint balanceAfter = address(msg.sender).balance;
+        Assert.equal(balanceBefore + 3600, balanceAfter, "Sender's balance is not the same as expected.");
     }
 
     /// #sender: account-0
     /// #value: 3600
     function testModifyScheduleWithOtherAccount() public payable {
-
+        // fail test can't be done.
     }
 
-    // NOT IMPLEMENTED YET
-    function testRemoveSchedule() public {
-        // remove schedule
+    /// #sender: account-0
+    /// #value: 0
+    function testRemoveSchedule() public payable {
+        Assert.equal(msg.sender, TestsAccounts.getAccount(0), "Invalid sender");
+        Assert.equal(msg.value, 0, "Invalid value");
 
-        // should not be returned by getSchedules
+        uint balanceBefore = address(msg.sender).balance;
+
+        ScheduleInfo testInfo = testScheds[testScheds.length-1];
+        //uint paidEth = testInfo.paidEth();
+        removeSchedule(testInfo.id());
+        //uint balanceBefore_clone = balanceBefore;
+        //uint paidEth_clone = paidEth;
+        uint balanceAfter = address(msg.sender).balance;
+        //require(balanceBefore + 3600 == balanceAfter, "require - Sender's balance is not the same as expected.");*/
+        Assert.ok(balanceBefore + 7200 == balanceAfter, "Sender's balance is not the same as expected.");
+
+        ScheduleInfo[] memory mySchedules = getMySchedules(testInfo.startTimestamp(), testInfo.endTimestamp());
+        Assert.ok(mySchedules.length == 0, "In time range of removed schedule, result of search should 0.");
     }
 
     

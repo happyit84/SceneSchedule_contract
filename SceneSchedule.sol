@@ -114,6 +114,10 @@ contract SceneSchedule is Ownable {
 
     receive() external payable {} // need payable keyword to get ETH
 
+    function getScheduleMapValue(uint keyTimestamp) public view onlyOwner returns (uint) {
+        return scheduleMap[keyTimestamp];
+    }
+
     function getTimestampNow() public view returns (uint) {
         return block.timestamp;
     }
@@ -189,7 +193,8 @@ contract SceneSchedule is Ownable {
                 if (onlyMine == false || info.booker() == msg.sender) {
                     myScheduleStartings[count] = t;
                     count++;
-                }
+                    t = info.endTimestamp() - HourInSeconds;
+                }                
             }
         }
    
@@ -293,7 +298,6 @@ contract SceneSchedule is Ownable {
         return getPermission() & permission == permission;
     }
 
-    event test_value(uint indexed v);
     function modifySchedule(uint scheduleIndex, uint newStartTimestamp, uint newEndTimestamp, string memory newData) 
         public payable returns (ScheduleInfo newScheduleInfo)
     {
