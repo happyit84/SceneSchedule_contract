@@ -17,6 +17,7 @@ contract TestSceneSchedule is SceneSchedule {
     uint createdScheduleIndex;
     ScheduleInfo scheduleInfo;
     ScheduleInfo scheduleInfo2;
+    ScheduleInfo scheduleInfo3;
 
     /// 'beforeAll' runs before all other tests
     /// More special functions are: 'beforeEach', 'beforeAll', 'afterEach' & 'afterAll'
@@ -165,7 +166,7 @@ contract TestSceneSchedule is SceneSchedule {
         Assert.equal(msg.value, 3600, "Invalid value");
         uint newStartTime = scheduleInfo.startTimestamp() + 3600;
         uint newEndTime = scheduleInfo.endTimestamp() + 3600;
-        scheduleInfo2 = modifySchedule(scheduleInfo.id(), newStartTime, newEndTime, scheduleInfo.data());//
+        scheduleInfo2 = modifySchedule(scheduleInfo.id(), newStartTime, newEndTime, scheduleInfo.data());
         ScheduleInfo[] memory mySchedules = getMySchedules(scheduleInfo2.startTimestamp(), scheduleInfo2.endTimestamp());
 
         Assert.equal(mySchedules[0].id(), scheduleInfo2.id(), "wrong id of modified schedule");
@@ -175,8 +176,17 @@ contract TestSceneSchedule is SceneSchedule {
 
     /// #sender: account-0
     /// #value: 3600
-    function testModifyScheduleMoreTime() public payable {
+    function testModifyScheduleWithMoreTime() public payable {
+        Assert.equal(msg.sender, TestsAccounts.getAccount(0), "Invalid sender");
+        Assert.equal(msg.value, 3600, "Invalid value");
 
+        uint newStartTime = scheduleInfo2.startTimestamp() + 3600;
+        uint newEndTime = scheduleInfo2.endTimestamp() + 3600*2;
+        scheduleInfo3 = modifySchedule(scheduleInfo2.id(), newStartTime, newEndTime, scheduleInfo2.data());
+        ScheduleInfo[] memory mySchedules = getMySchedules(scheduleInfo3.startTimestamp(), scheduleInfo3.endTimestamp());
+        Assert.equal(mySchedules[0].id(), scheduleInfo3.id(), "wrong id of modified schedule");
+        Assert.equal(mySchedules[0].startTimestamp(), newStartTime, "wrong startTimestamp of modified schedule");
+        Assert.equal(mySchedules[0].endTimestamp(), newEndTime, "wrong endTimestamp of modifed schedule");
     }
 
     function testModifyScheduleLessTime() public payable {

@@ -59,7 +59,6 @@ contract ScheduleInfo {
 
     function remove() public {
         removed = true;
-        paidEth = 0;
     }
 
     function getLengthInSeconds() public view returns (uint) {
@@ -251,6 +250,7 @@ contract SceneSchedule is Ownable {
 
         (bool ret, ) = payable(address(this)).call{value: msg.value}("");
         require(ret, "Failed to send ETH to contract");
+        createdScheduleInfo.setPaidEth(msg.value);
     }
 
     function _createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) public returns (ScheduleInfo info) {
@@ -293,6 +293,7 @@ contract SceneSchedule is Ownable {
         return getPermission() & permission == permission;
     }
 
+    event test_value(uint indexed v);
     function modifySchedule(uint scheduleIndex, uint newStartTimestamp, uint newEndTimestamp, string memory newData) 
         public payable returns (ScheduleInfo newScheduleInfo)
     {
