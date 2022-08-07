@@ -89,13 +89,29 @@ contract SceneScheduler is Ownable {
     }
     function getFeePerHour() public view returns (uint256 weiPerHour) {
         return fee.getFeePerHour();
-    }    
+    }
     function getFeePerDay() public view returns (uint256 weiPerDay) {
         return fee.getFeePerDay();
     }
-    
+
     Schedule [] schedules;
-    
+    function getScheduleDetail(uint id) public view returns (
+        uint startTimestamp,
+        uint endTimestamp,
+        address booker,
+        string memory data,
+        uint paidEth,
+        bool removed
+    ) {
+        Schedule s = schedules[id];
+        startTimestamp = s.startTimestamp();
+        endTimestamp = s.endTimestamp();
+        booker = s.booker();
+        data = s.data();
+        paidEth = s.paidEth();
+        removed = s.removed();
+    }
+
     mapping(uint => uint) scheduleMap; // each starting hour timpstamp => index in schedules
     uint constant NotReserved = 0; // value for representing not reserved in scheduleMap
     function getScheduleId(uint _startTimestamp) public view returns (uint) {
@@ -106,7 +122,7 @@ contract SceneScheduler is Ownable {
     uint constant MinuteInSeconds = 60;
     uint constant HourInSeconds = MinuteInSeconds * 60;
     uint constant DayInSeconds = HourInSeconds * 24;
-    
+
     uint private createScheduleLimitSeconds; // from present point only can create schedule within this value of seconds in the future
     function getCreateScheduleLimitSeconds() public view returns (uint) {
         return createScheduleLimitSeconds;
