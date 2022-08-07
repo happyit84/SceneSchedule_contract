@@ -9,10 +9,10 @@ import "remix_tests.sol";
 // Although it may fail compilation in 'Solidity Compiler' plugin
 // But it will work fine in 'Solidity Unit Testing' plugin
 import "remix_accounts.sol";
-import "../SceneSchedule.sol";
+import "../SceneScheduler.sol";
 
 // File name has to end with '_test.sol', this file can contain more than one testSuite contracts
-contract TestSceneSchedule is SceneSchedule {
+contract testSuite  is SceneScheduler{
 
     uint createdScheduleIndex;
     ScheduleInfo [] testScheds;
@@ -86,7 +86,7 @@ contract TestSceneSchedule is SceneSchedule {
         string memory data = "...";
         ScheduleInfo info = createSchedule(earliestStartTime, earliestEndTime, data);
         testScheds.push(info);
-        Assert.ok(info.id() != NotReserved, "scheduleIndex != sceneSchedule.getNotReserved()");
+        Assert.ok(info.id() != f().NotReserved(), "scheduleIndex != sceneSchedule.getNotReserved()");
 
         // test getMySchedule
         ScheduleInfo[] memory mySchedules = getMySchedules(earliestStartTime - 3600, earliestStartTime + 3600 * 4);
