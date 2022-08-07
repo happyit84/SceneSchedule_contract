@@ -85,7 +85,7 @@ contract TestSceneSchedule is SceneScheduler {
 
         string memory data = "...";
         uint newSchedId = createSchedule(earliestStartTime, earliestEndTime, data);
-        Schedule newSched = schedules[newSchedId];
+        Schedule newSched = f.getSchedule(newSchedId);
         testScheds.push(newSched);
         Assert.ok(newSched.id() != NotReserved, "scheduleIndex != sceneSchedule.getNotReserved()");
 

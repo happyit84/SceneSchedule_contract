@@ -65,6 +65,8 @@ contract Schedule {
         return (endTimestamp - startTimestamp);
     }
 
+    function setId(uint newId) public {id = newId;}
+
     function setBooker(address _booker) public {
         booker = _booker;
     }
@@ -85,15 +87,23 @@ contract Schedule {
 contract SceneSchedulerFields {
     FeeCache public fee;
 
+    Schedule [] public schedules;
+    function addSchedule(uint _startTimestamp, uint _endTimestamp, address _booker, string memory _data) public returns (uint newScheduleId) {
+        newScheduleId = schedules.length;
+        Schedule newSched = new Schedule(newScheduleId, _startTimestamp, _endTimestamp, _booker, _data);        
+        schedules.push(newSched);
+    }
+    function getSchedule(uint id) public view returns (Schedule) {return schedules[id];}
+    function setSchedule(uint id, Schedule s) public {schedules[id] = s;}
+
     constructor() {
         fee = new FeeCache();
     }
 }
 
 contract SceneScheduler is Ownable {
-    SceneSchedulerFields internal f;
+    SceneSchedulerFields internal f;    
     
-    Schedule [] schedules;
     function getScheduleDetail(uint id) public view returns (
         uint startTimestamp,
         uint endTimestamp,
@@ -102,7 +112,7 @@ contract SceneScheduler is Ownable {
         uint paidEth,
         bool removed
     ) {
-        Schedule s = schedules[id];
+        Schedule s = f.getSchedule(id);
         startTimestamp = s.startTimestamp();
         endTimestamp = s.endTimestamp();
         booker = s.booker();
@@ -155,8 +165,8 @@ contract SceneScheduler is Ownable {
         f = new SceneSchedulerFields();
         
         // add dummy info at the index=0, to use index 0 as NotReserved
-        Schedule dummySched = new Schedule(0, 0, 0, address(0), "");
-        schedules.push(dummySched);
+        f.addSchedule(0, 0, address(0), "");
+        
         createScheduleLimitSeconds = DayInSeconds * 30; // 30 days
         getMySchedulesLimitSeconds = DayInSeconds * 7; // 7 days
         changeScheduleLimitSeconds = DayInSeconds; // 24 hours
@@ -207,9 +217,9 @@ contract SceneScheduler is Ownable {
         uint count = 0;
         // calculate size of return array and cache the starting time of my schedules
         for (uint t = searchStartTimestamp; t < searchEndTimestamp; t += HourInSeconds) {
-            uint scheduleIndex = scheduleMap[t];            
-            if (scheduleIndex != NotReserved) {
-                Schedule s = schedules[scheduleIndex];
+            uint scheduleId = scheduleMap[t];            
+            if (scheduleId != NotReserved) {
+                Schedule s = f.getSchedule(scheduleId);
                 if (onlyMine == false || s.booker() == msg.sender) {
                     myScheduleStartings[count] = t;
                     count++;
@@ -223,8 +233,8 @@ contract SceneScheduler is Ownable {
         // fill the array for return
         for (uint i = 0; i < count; i++) {
             uint t = myScheduleStartings[i];
-            uint scheduleIndex = scheduleMap[t];
-            searchedSchedules[i] = schedules[scheduleIndex];
+            uint scheduleId = scheduleMap[t];
+            searchedSchedules[i] = f.getSchedule(scheduleId);
         }
 
         return searchedSchedules;
@@ -271,9 +281,9 @@ contract SceneScheduler is Ownable {
             bool removed) 
     {
         uint presentScheduleStartTimestamp = getPresentScheduleStartingTimestamp();
-        uint scheduleIndex = scheduleMap[presentScheduleStartTimestamp];
+        uint scheduleId = scheduleMap[presentScheduleStartTimestamp];
         if (NotReserved != scheduleMap[presentScheduleStartTimestamp]) {
-            Schedule s = schedules[scheduleIndex];
+            Schedule s = f.getSchedule(scheduleId);
             return (
                 true, 
                 s.id(),
@@ -326,10 +336,8 @@ contract SceneScheduler is Ownable {
             require(NotReserved == scheduleMap[t], "There's already reserved time.") ;
         }
 
-        // execute creating schedule
-        newSched = new Schedule(schedules.length, _startTimestamp, _endTimestamp, msg.sender, _data);
-        schedules.push(newSched);
-        require(schedules[schedules.length-1].id() == schedules.length-1, "new schedule id should be the same as the index in schedules array.");
+        // execute creating schedule        
+        f.addSchedule(_startTimestamp, _endTimestamp, msg.sender, _data);        
 
         for (uint t = _startTimestamp; t < _endTimestamp ; t += HourInSeconds) {
             scheduleMap[t] = newSched.id();
@@ -380,8 +388,8 @@ contract SceneScheduler is Ownable {
         removedSchedule.setPaidEth(0);
     }
 
-    function _removeSchedule(uint scheduleIndex) internal returns (Schedule) {
-        Schedule s = schedules[scheduleIndex];
+    function _removeSchedule(uint scheduleId) internal returns (Schedule) {
+        Schedule s = f.getSchedule(scheduleId);
         require(s.isValid(), "You can remove only valid schedules.");
         require(s.removed() == false, "You can't remove the schedule already removed.");
         require(msg.sender == s.booker() || hasPermission(PermissionRemoveOthersSchedule), "No permission to remove given schedule.");
@@ -391,7 +399,7 @@ contract SceneScheduler is Ownable {
             require(s.startTimestamp() - nowTimestamp > changeScheduleLimitSeconds, "You can't remove this schedule now.");
 
         for (uint t = s.startTimestamp(); t < s.endTimestamp(); t += HourInSeconds) {
-            require(scheduleMap[t] == scheduleIndex, "The time is not occupied by this schedule.");
+            require(scheduleMap[t] == scheduleId, "The time is not occupied by this schedule.");
             scheduleMap[t] = NotReserved;
         }
         s.remove();
