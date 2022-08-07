@@ -223,11 +223,33 @@ contract SceneScheduler is Ownable {
         return timestampNow - (timestampNow % HourInSeconds);
     }
 
-    function getScheduleNow() public view returns (bool scheduleExist, ScheduleInfo scheduleNow) {
+    function getScheduleNow() public view 
+        returns (
+            bool scheduleExist, 
+            uint id,
+            uint startTimestamp,
+            uint endTimestamp,
+            address booker,
+            string memory data,
+            uint paidEth,
+            bool removed) 
+    {
         uint presentScheduleStartTimestamp = getPresentScheduleStartingTimestamp();
         uint scheduleIndex = scheduleMap[presentScheduleStartTimestamp];
-        if (NotReserved != scheduleMap[presentScheduleStartTimestamp])            
-            return (true, schedules[scheduleIndex]);
+        if (NotReserved != scheduleMap[presentScheduleStartTimestamp]) {
+            ScheduleInfo s = schedules[scheduleIndex];
+            return (
+                true, 
+                s.id(),
+                s.startTimestamp(),
+                s.endTimestamp(),
+                s.booker(),
+                s.data(),
+                s.paidEth(),
+                s.removed()
+            );
+        }
+            
         scheduleExist = false;
     }
 
