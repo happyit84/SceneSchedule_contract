@@ -84,15 +84,52 @@ contract Schedule {
 
 contract SceneScheduler is Ownable {
     FeeCache private fee;
+    function setFee(uint newFeeWeiPerSecond) public onlyOwner {
+        fee.setFee(newFeeWeiPerSecond);
+    }
+    function getFeePerHour() public view returns (uint256 weiPerHour) {
+        return fee.getFeePerHour();
+    }    
+    function getFeePerDay() public view returns (uint256 weiPerDay) {
+        return fee.getFeePerDay();
+    }
+    
     Schedule [] schedules;
+    
     mapping(uint => uint) scheduleMap; // each starting hour timpstamp => index in schedules
     uint constant NotReserved = 0; // value for representing not reserved in scheduleMap
+    function getScheduleId(uint _startTimestamp) public view returns (uint) {
+        require(_startTimestamp % HourInSeconds == 0, "_startTimestamp should point at the starting of each hour");
+        return scheduleMap[_startTimestamp];
+    }
+
     uint constant MinuteInSeconds = 60;
     uint constant HourInSeconds = MinuteInSeconds * 60;
     uint constant DayInSeconds = HourInSeconds * 24;
+    
     uint private createScheduleLimitSeconds; // from present point only can create schedule within this value of seconds in the future
+    function getCreateScheduleLimitSeconds() public view returns (uint) {
+        return createScheduleLimitSeconds;
+    }
+    function setCreateScheduleLimitSeconds(uint newValue) public onlyOwner {
+        createScheduleLimitSeconds = newValue;
+    }
+
     uint private getMySchedulesLimitSeconds;
+    function getChangeScheduleLimitSeconds() public view returns (uint) {
+        return changeScheduleLimitSeconds;
+    }
+    function setChangeScheduleLimitSeconds(uint newValue) public onlyOwner {
+        changeScheduleLimitSeconds = newValue;
+    }
+
     uint private changeScheduleLimitSeconds;
+    function getFeePerSecond() public view returns (uint256 weiPerSecond) {
+        return fee.getFeePerSecond();
+    }
+    function getFeePerMinute() public view returns (uint256 weiPerMinute) {
+        return fee.getFeePerMinute();
+    }
 
     uint constant PermissionAdmin = 0xffffffffffffffffffffffffffffffff;
     uint constant PermissionReadOthersSchedule = 0x1;
@@ -113,11 +150,7 @@ contract SceneScheduler is Ownable {
     }
 
     receive() external payable {} // need payable keyword to get ETH
-
-    function getScheduleMapValue(uint keyTimestamp) public view onlyOwner returns (uint) {
-        return scheduleMap[keyTimestamp];
-    }
-
+    
     function getTimestampNow() public view returns (uint) {
         return block.timestamp;
     }
@@ -126,44 +159,6 @@ contract SceneScheduler is Ownable {
         return address(this).balance;
     }
     
-    function setFee(uint newFeeWeiPerSecond) public onlyOwner {
-        fee.setFee(newFeeWeiPerSecond);
-    }
-
-    function getCreateScheduleLimitSeconds() public view returns (uint) {
-        return createScheduleLimitSeconds;
-    }
-    function setCreateScheduleLimitSeconds(uint newValue) public onlyOwner {
-        createScheduleLimitSeconds = newValue;
-    }
-
-    function getChangeScheduleLimitSeconds() public view returns (uint) {
-        return changeScheduleLimitSeconds;
-    }
-    function setChangeScheduleLimitSeconds(uint newValue) public onlyOwner {
-        changeScheduleLimitSeconds = newValue;
-    }
-
-    function getFeePerSecond() public view returns (uint256 weiPerSecond) {
-        return fee.getFeePerSecond();
-    }
-
-    function getFeePerMinute() public view returns (uint256 weiPerMinute) {
-        return fee.getFeePerMinute();
-    }
-
-    function getFeePerHour() public view returns (uint256 weiPerHour) {
-        return fee.getFeePerHour();
-    }
-    
-    function getFeePerDay() public view returns (uint256 weiPerDay) {
-        return fee.getFeePerDay();
-    }
-
-    function getNotReserved() external pure returns (uint) {
-        return NotReserved;
-    }
-
     function getEarliestStartingHourTimestampWithPresentTimestamp() public view returns (uint earliestStartTime, uint timestampNow) {
         timestampNow = block.timestamp;
         uint remainder = timestampNow % HourInSeconds;
@@ -210,12 +205,28 @@ contract SceneScheduler is Ownable {
         return searchedSchedules;
     }
 
+    function _getScheduleIds(uint searchStartTimestamp, uint searchEndTimestamp, bool onlyMine) public view returns (uint[] memory) {
+        Schedule [] memory retSchedules = _getSchedules(searchStartTimestamp, searchEndTimestamp, onlyMine);
+        uint [] memory ids = new uint[](retSchedules.length);
+        for(uint i=0; i < ids.length; i++) {
+            ids[i] = retSchedules[i].id();
+        }
+        return ids;
+    }
+
     function getSchedules(uint searchStartTimestamp, uint searchEndTimestamp) public view returns (Schedule[] memory) {
         return _getSchedules(searchStartTimestamp, searchEndTimestamp, false);
     }
 
+    function getScheduleIds(uint searchStartTimestamp, uint searchEndTimestamp) public view returns (uint[] memory) {
+        return _getScheduleIds(searchStartTimestamp, searchEndTimestamp, false);
+    }
+
     function getMySchedules(uint searchStartTimestamp, uint searchEndTimestamp) public view returns (Schedule[] memory) {
         return _getSchedules(searchStartTimestamp, searchEndTimestamp, true);
+    }
+    function getMyScheduleIds(uint searchStartTimestamp, uint searchEndTimestamp) public view returns (uint[] memory) {
+        return _getScheduleIds(searchStartTimestamp, searchEndTimestamp, true);
     }
 
     function getPresentScheduleStartingTimestamp() public view returns (uint) {
@@ -251,11 +262,6 @@ contract SceneScheduler is Ownable {
         }
             
         scheduleExist = false;
-    }
-
-    function getScheduleIndex(uint _startTimestamp) public view returns (uint) {
-        require(_startTimestamp % HourInSeconds == 0, "_startTimestamp should point at the starting of each hour");
-        return scheduleMap[_startTimestamp];
     }
 
     function createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) public payable returns (uint newScheduleId) {
