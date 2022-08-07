@@ -82,18 +82,17 @@ contract Schedule {
     }
 }
 
-contract SceneScheduler is Ownable {
-    FeeCache private fee;
-    function setFee(uint newFeeWeiPerSecond) public onlyOwner {
-        fee.setFee(newFeeWeiPerSecond);
-    }
-    function getFeePerHour() public view returns (uint256 weiPerHour) {
-        return fee.getFeePerHour();
-    }
-    function getFeePerDay() public view returns (uint256 weiPerDay) {
-        return fee.getFeePerDay();
-    }
+contract SceneSchedulerFields {
+    FeeCache public fee;
 
+    constructor() {
+        fee = new FeeCache();
+    }
+}
+
+contract SceneScheduler is Ownable {
+    SceneSchedulerFields internal f;
+    
     Schedule [] schedules;
     function getScheduleDetail(uint id) public view returns (
         uint startTimestamp,
@@ -141,10 +140,10 @@ contract SceneScheduler is Ownable {
 
     uint private changeScheduleLimitSeconds;
     function getFeePerSecond() public view returns (uint256 weiPerSecond) {
-        return fee.getFeePerSecond();
+        return f.fee().getFeePerSecond();
     }
     function getFeePerMinute() public view returns (uint256 weiPerMinute) {
-        return fee.getFeePerMinute();
+        return f.fee().getFeePerMinute();
     }
 
     uint constant PermissionAdmin = 0xffffffffffffffffffffffffffffffff;
@@ -153,8 +152,8 @@ contract SceneScheduler is Ownable {
     mapping(address => uint) permissionMap;
 
     constructor() payable {
-        fee = new FeeCache();
-
+        f = new SceneSchedulerFields();
+        
         // add dummy info at the index=0, to use index 0 as NotReserved
         Schedule dummySched = new Schedule(0, 0, 0, address(0), "");
         schedules.push(dummySched);
@@ -164,9 +163,19 @@ contract SceneScheduler is Ownable {
         
         permissionMap[owner()] = PermissionAdmin; // grant all the permission to owner
     }
-
     receive() external payable {} // need payable keyword to get ETH
     
+    function setFee(uint newFeeWeiPerSecond) public onlyOwner {
+        f.fee().setFee(newFeeWeiPerSecond);
+    }
+    function getFeePerHour() public view returns (uint256 weiPerHour) {
+        return f.fee().getFeePerHour();
+    }
+    function getFeePerDay() public view returns (uint256 weiPerDay) {
+        return f.fee().getFeePerDay();
+    }
+
+
     function getTimestampNow() public view returns (uint) {
         return block.timestamp;
     }
@@ -284,7 +293,7 @@ contract SceneScheduler is Ownable {
         Schedule newSchedule = _createSchedule(_startTimestamp, _endTimestamp, _data);
 
         // check sent ETH amount        
-        uint totalFee = newSchedule.getLengthInSeconds() * fee.getFeePerSecond();
+        uint totalFee = newSchedule.getLengthInSeconds() * f.fee().getFeePerSecond();
         if (msg.value < totalFee)
             revert("ETH amount is not enough to create schedule for given period.");
         else if (msg.value > totalFee)
@@ -344,7 +353,7 @@ contract SceneScheduler is Ownable {
         newSchedule = _createSchedule(newStartTimestamp, newEndTimestamp, newData);
         
         // check sent ETH amount
-        uint feeForCreate = newSchedule.getLengthInSeconds() * fee.getFeePerSecond();
+        uint feeForCreate = newSchedule.getLengthInSeconds() * f.fee().getFeePerSecond();
         if (feeForCreate > removedSchedule.paidEth()) {
             uint ethToPay = feeForCreate - removedSchedule.paidEth();
             if (msg.value < ethToPay)
