@@ -174,7 +174,7 @@ contract SceneSchedule is Ownable {
         (earliestStartTimestamp, ) = getEarliestStartingHourTimestampWithPresentTimestamp();
     }
 
-    function _getSchedules(uint searchStartTimestamp, uint searchEndTimestamp, bool onlyMine) internal returns (ScheduleInfo[] memory mySchedules) {        
+    function _getSchedules(uint searchStartTimestamp, uint searchEndTimestamp, bool onlyMine) internal view returns (ScheduleInfo[] memory searchedSchedules) {        
         require(searchStartTimestamp % HourInSeconds == 0, "searchStartTimpstamp should point at the starting of an hour.");
         if (searchEndTimestamp == 0)
             searchEndTimestamp = searchStartTimestamp + DayInSeconds*7;
@@ -198,30 +198,23 @@ contract SceneSchedule is Ownable {
             }
         }
    
-        mySchedules = new ScheduleInfo[](count);
+        searchedSchedules = new ScheduleInfo[](count);
 
         // fill the array for return
         for (uint i = 0; i < count; i++) {
             uint t = myScheduleStartings[i];
             uint scheduleIndex = scheduleMap[t];
-            ScheduleInfo info = schedules[scheduleIndex];
-
-            // return only if user has a permission to read other's schedule info
-            mySchedules[i] = new ScheduleInfo(info.id(), info.startTimestamp(), info.endTimestamp(), address(0), "");
-            if (hasPermission(PermissionReadOthersSchedule)) {
-                mySchedules[i].setBooker(info.booker());
-                mySchedules[i].setData(info.data());
-            }
+            searchedSchedules[i] = schedules[scheduleIndex];
         }
 
-        return mySchedules;
+        return searchedSchedules;
     }
 
-    function getSchedules(uint searchStartTimestamp, uint searchEndTimestamp) public returns (ScheduleInfo[] memory) {
+    function getSchedules(uint searchStartTimestamp, uint searchEndTimestamp) public view returns (ScheduleInfo[] memory) {
         return _getSchedules(searchStartTimestamp, searchEndTimestamp, false);
     }
 
-    function getMySchedules(uint searchStartTimestamp, uint searchEndTimestamp) public returns (ScheduleInfo[] memory mySchedules) {
+    function getMySchedules(uint searchStartTimestamp, uint searchEndTimestamp) public view returns (ScheduleInfo[] memory) {
         return _getSchedules(searchStartTimestamp, searchEndTimestamp, true);
     }
 
@@ -258,7 +251,7 @@ contract SceneSchedule is Ownable {
         createdScheduleInfo.setPaidEth(msg.value);
     }
 
-    function _createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) public returns (ScheduleInfo info) {
+    function _createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) internal returns (ScheduleInfo info) {
         // check if timestamp is hour base
         // check start time
         require(_startTimestamp >= block.timestamp, "_startTimestamp should not be past time.");
@@ -332,7 +325,7 @@ contract SceneSchedule is Ownable {
         removedScheduleInfo.setPaidEth(0);
     }
 
-    function _removeSchedule(uint scheduleIndex) public returns (ScheduleInfo) {
+    function _removeSchedule(uint scheduleIndex) internal returns (ScheduleInfo) {
         ScheduleInfo info = schedules[scheduleIndex];
         require(info.isValid(), "You can remove only valid schedules.");
         require(info.removed() == false, "You can't remove the schedule already removed.");
