@@ -82,7 +82,7 @@ contract ScheduleInfo {
     }
 }
 
-contract SceneSchedule is Ownable {
+contract SceneScheduler is Ownable {
     FeeCache private fee;
     ScheduleInfo [] schedules;
     mapping(uint => uint) scheduleMap; // each starting hour timpstamp => index in schedules
