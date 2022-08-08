@@ -88,10 +88,10 @@ contract SceneSchedulerFields {
     FeeCache public fee;
 
     Schedule [] public schedules;
-    function addSchedule(uint _startTimestamp, uint _endTimestamp, address _booker, string memory _data) public returns (uint newScheduleId) {
-        newScheduleId = schedules.length;
-        Schedule newSched = new Schedule(newScheduleId, _startTimestamp, _endTimestamp, _booker, _data);        
-        schedules.push(newSched);
+    function addSchedule(uint _startTimestamp, uint _endTimestamp, address _booker, string memory _data) public returns (Schedule newSchedule) {
+        uint newScheduleId = schedules.length;
+        newSchedule = new Schedule(newScheduleId, _startTimestamp, _endTimestamp, _booker, _data);        
+        schedules.push(newSchedule);
     }
     function getSchedule(uint id) public view returns (Schedule) {return schedules[id];}
     function setSchedule(uint id, Schedule s) public {schedules[id] = s;}
@@ -316,7 +316,7 @@ contract SceneScheduler is Ownable {
         return newSchedule.id();
     }
 
-    function _createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) internal returns (Schedule newSched) {
+    function _createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) internal returns (Schedule newSchedule) {
         // check if timestamp is hour base
         // check start time
         require(_startTimestamp >= block.timestamp, "_startTimestamp should not be past time.");
@@ -337,13 +337,10 @@ contract SceneScheduler is Ownable {
         }
 
         // execute creating schedule        
-        f.addSchedule(_startTimestamp, _endTimestamp, msg.sender, _data);        
-
+        newSchedule = f.addSchedule(_startTimestamp, _endTimestamp, msg.sender, _data);
         for (uint t = _startTimestamp; t < _endTimestamp ; t += HourInSeconds) {
-            scheduleMap[t] = newSched.id();
+            scheduleMap[t] = newSchedule.id();
         }
-        
-        return newSched;
     }
 
     function getPermission() internal view returns (uint) {
