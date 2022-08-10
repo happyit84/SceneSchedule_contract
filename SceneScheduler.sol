@@ -159,6 +159,7 @@ contract SceneScheduler is Ownable {
     uint constant PermissionAdmin = 0xffffffffffffffffffffffffffffffff;
     uint constant PermissionReadOthersSchedule = 0x1;
     uint constant PermissionRemoveOthersSchedule = 0x2;
+    uint constant PermissionUpdatePastSchedule = 0x4; // permision to create, remove or modify already started or past schedule
     mapping(address => uint) permissionMap;
 
     constructor() payable {
@@ -319,7 +320,8 @@ contract SceneScheduler is Ownable {
     function _createSchedule(uint _startTimestamp, uint _endTimestamp, string memory _data) internal returns (Schedule newSchedule) {
         // check if timestamp is hour base
         // check start time
-        require(_startTimestamp >= block.timestamp, "_startTimestamp should not be past time.");
+        if (hasPermission(PermissionUpdatePastSchedule) == false)
+            require(_startTimestamp >= block.timestamp, "_startTimestamp should not be past time.");
         require(_startTimestamp % HourInSeconds == 0, "_startTimestamp should point at starting of each hour.");
         uint timestampLimit = getEarliestStartingHourTimestamp() + createScheduleLimitSeconds;
         require(_startTimestamp < timestampLimit, "Too much future time. Check the limit of seconds with getCreateScheduleLimitSeconds()");
@@ -391,7 +393,8 @@ contract SceneScheduler is Ownable {
         require(s.removed() == false, "You can't remove the schedule already removed.");
         require(msg.sender == s.booker() || hasPermission(PermissionRemoveOthersSchedule), "No permission to remove given schedule.");
         uint nowTimestamp = block.timestamp;
-        require(nowTimestamp < s.startTimestamp(), "schedule you want to remove should not be the past");
+        if (hasPermission(PermissionUpdatePastSchedule) == false)
+            require(nowTimestamp < s.startTimestamp(), "schedule you want to remove should not be the past");
         if (hasPermission(PermissionRemoveOthersSchedule) == false)
             require(s.startTimestamp() - nowTimestamp > changeScheduleLimitSeconds, "You can't remove this schedule now.");
 
